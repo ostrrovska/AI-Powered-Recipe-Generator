@@ -19,8 +19,8 @@ def normalize_ingredient(ingredient_text):
         "half", "purpose", "pound", "ounce", "gram", "milliliter", "liter", "gallon",
         "quart", "pint", "dash", "pinch", "clove", "can", "package", "container",
         "jar", "loaf", "bottle", "pack", "cube", "stalk", "bulb", "strip", "packet",
-        "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup", "cups"
-        "bite", "size", "bunch", "cups",
+        "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
+        "bite", "size", "bunch", "cups","all", "sized"
     }
 
     # Set of fractions to exclude
@@ -36,13 +36,13 @@ def normalize_ingredient(ingredient_text):
                 token.lemma_.lower() in measurement_units):
             continue
 
-        # Focus on nouns, proper nouns, and adjectives that modify nouns
+            # Focus on nouns, proper nouns, and adjectives that modify nouns
         if token.pos_ in {"NOUN", "PROPN", "ADJ"}:
-            # Include adjectives only if they modify a noun (e.g., "dried split peas")
+                # Include adjectives only if they modify a noun (e.g., "dried split peas")
             if token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN"}:
-                relevant_terms.append(token.lemma_.lower())
+                    relevant_terms.append(token.lemma_.lower())
             elif token.pos_ in {"NOUN", "PROPN"}:
-                relevant_terms.append(token.lemma_.lower())
+                    relevant_terms.append(token.lemma_.lower())
 
     return " ".join(relevant_terms)
 
