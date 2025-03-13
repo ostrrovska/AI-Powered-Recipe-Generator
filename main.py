@@ -35,7 +35,7 @@ def extract_recipe_info(url):
         print(f"Element not found: {e}")
         return None, None
 
-def get_recipe_links(section_url, num_pages=5):
+def get_recipe_links(section_url, num_pages=2):
     """
     Scrape recipe links from multiple pages of a search section.
     """
@@ -70,7 +70,7 @@ def main():
     for section in search_sections:
         print(f"Scraping {section['name']} recipes...")
         section_url = section["url"]
-        recipe_links = get_recipe_links(section_url, num_pages=5)  # Scrape 5 pages (120 recipes)
+        recipe_links = get_recipe_links(section_url, num_pages=2)  # Scrape 5 pages (120 recipes)
 
         # Scrape details for each recipe
         for link in recipe_links:

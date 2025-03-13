@@ -8,74 +8,50 @@ df = pd.read_csv("recipes.csv")
 
 def normalize_ingredient(ingredient_text):
     doc = nlp(ingredient_text)
+
+    # Set of measurement units to exclude
     measurement_units = {
-        "cup", "cups", "teaspoon", "teaspoons", "tablespoon", "tablespoons",
-        "gram", "grams", "ounce", "ounces", "pound", "pounds", "can", "cans",
-        "clove", "cloves", "pinch", "dash", "quart", "quarts", "liter", "liters",
-        "milliliter", "milliliters", "ml", "gallon", "gallons", "stick", "sticks"
+        "cup", "teaspoon", "tablespoon", "tablespoons", "gram", "ounce", "pound", "can",
+        "clove", "pinch", "dash", "quart", "liter", "milliliter", "gallon",
+        "stick", "rib", "head", "package", "inch", "piece", "fluid", "container",
+        "jar", "loaf", "bottle", "pack", "pint", "cube", "stalk", "slice", "bulb",
+        "strip", "packet", "envelope", "box", "bag", "carton", "sprig", "leaf",
+        "half", "purpose", "pound", "ounce", "gram", "milliliter", "liter", "gallon",
+        "quart", "pint", "dash", "pinch", "clove", "can", "package", "container",
+        "jar", "loaf", "bottle", "pack", "cube", "stalk", "bulb", "strip", "packet",
+        "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup", "cups"
+        "bite", "size", "bunch", "cups",
     }
 
-    remove_with_flour = {"purpose", "wheat", "almond"}
+    # Set of fractions to exclude
+    fractions = {'½', '¼', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞', '⅙', '⅚'}
+
+    # List to store relevant terms
     relevant_terms = []
-    has_flour = False
 
-    # Explicit list of critical nouns to always include
-    critical_nouns = {"garlic", "cheese", "butter", "salt", "pepper"}
-
-    # Check for flour presence
     for token in doc:
-        if token.lemma_.lower() == "flour":
-            has_flour = True
+        # Skip numbers, fractions, and measurement units
+        if (token.like_num or
+                token.text in fractions or
+                token.lemma_.lower() in measurement_units):
+            continue
 
-    for chunk in doc.noun_chunks:
-        chunk_terms = []
-        for token in chunk:
-            lemma = token.lemma_.lower().strip()
-
-            # Skip numbers, units, stops, punctuation
-            if token.like_num or lemma in measurement_units or token.is_stop or token.is_punct:
-                continue
-
-            # Skip flour-related terms if flour is present
-            if has_flour and lemma in remove_with_flour:
-                continue
-
-            # Always include critical nouns (even if they appear as VERB/ADJ due to parsing errors)
-            if lemma in critical_nouns:
-                chunk_terms.append(lemma)
-                continue
-
-            # Include adjectives and nouns
-            if token.pos_ in ("ADJ", "NOUN", "PROPN"):
-                chunk_terms.append(lemma)
-
-        if chunk_terms:
-            relevant_terms.extend(chunk_terms)
-
-    # Fallback: If no terms found but garlic exists in text
-    if not relevant_terms and "garlic" in ingredient_text.lower():
-        return "garlic"
+        # Focus on nouns, proper nouns, and adjectives that modify nouns
+        if token.pos_ in {"NOUN", "PROPN", "ADJ"}:
+            # Include adjectives only if they modify a noun (e.g., "dried split peas")
+            if token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN"}:
+                relevant_terms.append(token.lemma_.lower())
+            elif token.pos_ in {"NOUN", "PROPN"}:
+                relevant_terms.append(token.lemma_.lower())
 
     return " ".join(relevant_terms)
 
-# Тестові приклади
-test_ingredients = [
-    "2 cups all-purpose flour",
-    "1 tablespoon chopped fresh parsley",
-    "3 cloves garlic, minced",
-    "1/2 teaspoon salt",
-    "4 large tomatoes",
-    "200 ml whole milk",
-    "5 sticks unsalted butter, softened",
-    "1 pinch of cinnamon powder",
-    "1/4 cup grated Parmesan cheese",
-    "2 tablespoons freshly squeezed lemon juice",
-    "1 cup whole wheat flour",
-    "1/2 cup almond flour",
-    "3 ounces shredded mozzarella cheese"
-]
+# Додаємо новий стовпець з нормалізованими інгредієнтами
+df["normalized_ingredients"] = df["ingredients"].apply(normalize_ingredient)
 
-for ingredient in test_ingredients:
-    normalized = normalize_ingredient(ingredient)
-    print(f"Original: {ingredient}")
-    print(f"Normalized: {normalized}\n")
+for original, normalized in zip(df["ingredients"], df["normalized_ingredients"]):
+    print(f"Оригінал: {original}")
+    print(f"Нормалізовано: {normalized}\n")
+
+# Зберігаємо результат у новий CSV файл
+df.to_csv("normalized_recipes.csv", index=False)
