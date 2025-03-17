@@ -20,11 +20,17 @@ def normalize_ingredient(ingredient_text):
         "quart", "pint", "dash", "pinch", "clove", "can", "package", "container",
         "jar", "loaf", "bottle", "pack", "cube", "stalk", "bulb", "strip", "packet",
         "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
-        "bite", "size", "bunch", "cups", "all", "sized", "chunks"
+        "bite", "size", "bunch", "cups", "all", "sized", "chunks", "chunk", "casing", "dice"
     }
 
     # Set of fractions to exclude
-    fractions = {'½', '¼', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞', '⅙', '⅚', '®'}
+    fractions = {'½', '¼', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞', '⅙', '⅚', }
+
+    additional_exclude = {
+        "optional", "more", "as", "needed", "to", "taste", "divided", "enough", "cover",
+        "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
+        '®', "cubed", "medium", "large", "small", "undrained"
+    }
 
     # List to store relevant terms
     relevant_terms = []
@@ -33,7 +39,9 @@ def normalize_ingredient(ingredient_text):
         # Skip numbers, fractions, and measurement units
         if (token.like_num or
                 token.text in fractions or
-                token.lemma_.lower() in measurement_units):
+                token.lemma_.lower() in measurement_units or
+                token.is_punct or
+                token.lemma_.lower() in additional_exclude):
             continue
 
         # Handle compound nouns
@@ -46,7 +54,10 @@ def normalize_ingredient(ingredient_text):
             elif token.pos_ in {"NOUN", "PROPN"}:
                 relevant_terms.append(token.lemma_.lower())
 
-    return " ".join(relevant_terms)
+    #return " ".join(relevant_terms)
+    normalized = " ".join(relevant_terms)
+    normalized = ' '.join(normalized.split())  # Clean up spaces
+    return normalized
 
 
 df["normalized_ingredients"] = df["ingredients"].apply(normalize_ingredient)
