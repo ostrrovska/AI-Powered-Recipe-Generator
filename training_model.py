@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 
 # Завантажити нормалізовані дані
 df = pd.read_csv("normalized_recipes.csv")
-df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split())
+df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split(','))
 
 
 # Створити словник унікальних інгредієнтів

@@ -6,7 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 # Завантажити дані
 df = pd.read_csv("normalized_recipes.csv")
-df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split())
+df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split(','))
 
 # Створити словник унікальних інгредієнтів
 all_ingredients = list(set(ing for sublist in df["normalized_ingredients"] for ing in sublist))
@@ -49,8 +49,13 @@ model.load_state_dict(torch.load("recipe_model.pth", map_location=device))
 model.to(device)
 model.eval()
 
-def get_recommendations(user_input, top_k=5, require_all=False):
+
+def get_recommendations(user_input, top_k=3, require_all=False):
     user_ingredients = [ing.strip().lower() for ing in user_input.split(",")]
+
+    def contains_partial_match(ingredient, recipe_ingredients):
+        return any(ingredient in ing for ing in recipe_ingredients)
+
     input_vector = recipe_to_multihot(user_ingredients)
 
     with torch.no_grad():
@@ -64,10 +69,11 @@ def get_recommendations(user_input, top_k=5, require_all=False):
             _, recipe_embedding = model(recipe_tensor)
             sim = cosine_similarity(embedding.cpu().numpy(), recipe_embedding.cpu().numpy())
 
-            # Перевірка, чи рецепт містить хоча б один із введених інгредієнтів
-            contains_any = any(ing in recipe for ing in user_ingredients)
-            # Перевірка, чи рецепт містить всі введені інгредієнти (якщо require_all=True)
-            contains_all = all(ing in recipe for ing in user_ingredients) if require_all else True
+            # Дозволити частковий збіг, наприклад "cheese" знайде "parmesan cheese"
+            contains_any = any(contains_partial_match(ing, recipe) for ing in user_ingredients)
+
+            # Всі інгредієнти повинні бути знайдені (якщо require_all=True)
+            contains_all = all(contains_partial_match(ing, recipe) for ing in user_ingredients) if require_all else True
 
             if contains_any and contains_all:
                 similarities.append((idx, sim[0][0]))
@@ -75,6 +81,7 @@ def get_recommendations(user_input, top_k=5, require_all=False):
     # Сортування за схожістю та вибір топ-k рецептів
     top_indices = sorted(similarities, key=lambda x: x[1], reverse=True)[:top_k]
     return df.iloc[[idx for idx, _ in top_indices]]
+
 
 # Тестування
 user_input = input("Введіть інгредієнти (через кому): ")
@@ -84,4 +91,4 @@ recommendations = get_recommendations(user_input, require_all=require_all)
 print("\nРекомендації:")
 for _, row in recommendations.iterrows():
     print(f"\nРецепт: {row['title']}")
-    print("Інгредієнти:", " ".join(row['normalized_ingredients']))
+    print("Інгредієнти:", ", ".join(row['normalized_ingredients']))
