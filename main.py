@@ -40,15 +40,24 @@ def get_recipe_links(section_url, num_pages=1):
     Scrape recipe links from multiple pages of a search section.
     """
     recipe_links = []
+
+    # List of possible class names
+    class_names = [
+        "comp mntl-card-list-card--extendable mntl-universal-card mntl-document-card mntl-card card card--no-image",
+        #"comp mntl-card-list-items mntl-universal-card mntl-document-card mntl-card card card--no-image",  # Replace with the actual second class
+        #"comp mntl-card-list-card--extendable mntl-universal-card mntl-document-card mntl-card card card--no-image"  # Add more classes if necessary
+    ]
+
     for page in range(num_pages):
-        offset = page * 24  # AllRecipes shows 24 recipes per page
+        offset = page * 24  # Assuming 24 recipes per page
         search_url = f"{section_url}&offset={offset}"
         response = requests.get(search_url, headers=headers)
         soup = BeautifulSoup(response.text, "html.parser")
 
-        # Extract recipe links
-        links = [a["href"] for a in soup.find_all("a", {"class": "comp mntl-card-list-card--extendable mntl-universal-card mntl-document-card mntl-card card card--no-image"})]
-        recipe_links.extend(links)
+        # Extract links using multiple class names
+        for class_name in class_names:
+            links = [a["href"] for a in soup.find_all("a", class_=class_name)]
+            recipe_links.extend(links)
 
         # Add delay to avoid being blocked
         time.sleep(2)
@@ -59,8 +68,14 @@ def main():
     # Define search sections
     search_sections = [
         {"name": "soup", "url": "https://www.allrecipes.com/search?q=soup"},
-        #{"name": "sandwich", "url": "https://www.allrecipes.com/search?sandwich=sandwich&offset=0&q=sandwich"},
-        #{"name": "pasta", "url": "https://www.allrecipes.com/search?q=pasta"},
+        {"name": "dessert", "url": "https://www.allrecipes.com/search?q=dessert"},
+        {"name": "breakfast", "url": "https://www.allrecipes.com/search?q=breakfast"},
+        {"name": "pasta", "url": "https://www.allrecipes.com/search?q=pasta"},
+        {"name": "rice", "url": "https://www.allrecipes.com/search?q=Rice"},
+        {"name": "salad", "url": "https://www.allrecipes.com/search?q=salad"},
+        {"name": "meat", "url": "https://www.allrecipes.com/search?q=meat"},
+        {"name": "vegan", "url": "https://www.allrecipes.com/search?q=vegan"},
+        {"name": "fish", "url": "https://www.allrecipes.com/search?q=fish"},
         # Add more sections as needed
     ]
 

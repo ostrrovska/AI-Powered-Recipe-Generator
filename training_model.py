@@ -67,7 +67,7 @@ dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 # Навчання
 criterion = nn.BCELoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-num_epochs = 30
+num_epochs = 40
 
 print("Початок навчання...")
 for epoch in range(num_epochs):

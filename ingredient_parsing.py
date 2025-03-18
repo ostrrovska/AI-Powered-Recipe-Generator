@@ -29,7 +29,7 @@ def normalize_ingredient(ingredient_text):
     additional_exclude = {
         "optional", "more", "as", "needed", "to", "taste", "divided", "enough", "cover",
         "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
-        '®', "cubed", "medium", "large", "small", "undrained"
+        '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant"
     }
 
     # List to store relevant terms
@@ -62,8 +62,8 @@ def normalize_ingredient(ingredient_text):
 
 df["normalized_ingredients"] = df["ingredients"].apply(normalize_ingredient)
 
-for original, normalized in zip(df["ingredients"], df["normalized_ingredients"]):
-    print(f"Оригінал: {original}")
-    print(f"Нормалізовано: {normalized}\n")
+#for original, normalized in zip(df["ingredients"], df["normalized_ingredients"]):
+#    print(f"Оригінал: {original}")
+ #   print(f"Нормалізовано: {normalized}\n")
 
 df.to_csv("normalized_recipes.csv", index=False)
