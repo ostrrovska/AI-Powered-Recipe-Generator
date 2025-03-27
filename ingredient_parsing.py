@@ -1,10 +1,16 @@
 import pandas as pd
 import spacy
 import ast
+import psycopg2
 
 nlp = spacy.load("en_core_web_md")
-
-df = pd.read_csv("recipes.csv")
+def get_db_connection():
+    return psycopg2.connect(
+        dbname="recipe_db",       # Your database name
+        user="recipe_user",       # Your database user
+        password="1234", # Your database password
+        host="localhost"          # Your database host
+    )
 
 
 def normalize_ingredient(ingredient_text):
@@ -46,7 +52,7 @@ def normalize_ingredient(ingredient_text):
         additional_exclude = {
             "optional", "more", "as", "needed", "to", "taste", "divided", "enough", "cover",
             "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
-            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant"
+            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced"
         }
 
         # List to store relevant terms
@@ -79,11 +85,34 @@ def normalize_ingredient(ingredient_text):
     # Return ingredients as a comma-separated string
     return ",".join(normalized_ingredients)
 
+def normalize_and_store_ingredients():
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-df["normalized_ingredients"] = df["ingredients"].apply(normalize_ingredient)
+    # Fetch all recipes with non-normalized ingredients
+    cur.execute("SELECT id, original_ingredients FROM recipes WHERE normalized_ingredients IS NULL")
+    recipes = cur.fetchall()
 
-#for original, normalized in zip(df["ingredients"], df["normalized_ingredients"]):
-#    print(f"Оригінал: {original}")
- #   print(f"Нормалізовано: {normalized}\n")
+    for recipe_id, ingredients in recipes:
+        try:
+            # Normalize the ingredients
+            normalized = normalize_ingredient(ingredients)
 
-df.to_csv("normalized_recipes.csv", index=False)
+            # Update the database
+            cur.execute("""
+                UPDATE recipes
+                SET normalized_ingredients = %s
+                WHERE id = %s
+            """, (normalized.split(','), recipe_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Error normalizing recipe {recipe_id}: {e}")
+            conn.rollback()
+
+    cur.close()
+    conn.close()
+    print("Ingredient normalization complete.")
+
+if __name__ == "__main__":
+    normalize_and_store_ingredients()
+
