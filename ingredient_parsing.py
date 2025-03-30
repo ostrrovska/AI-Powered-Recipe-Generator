@@ -13,6 +13,37 @@ def get_db_connection():
     )
 
 
+def deduplicate_ingredients():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Update all recipes using PostgreSQL's array functions
+        cur.execute("""
+            UPDATE recipes
+            SET normalized_ingredients = ARRAY(
+                SELECT elem
+                FROM (
+                    SELECT DISTINCT ON (lower(elem)) elem, idx
+                    FROM unnest(normalized_ingredients) WITH ORDINALITY AS arr(elem, idx)
+                    WHERE elem IS NOT NULL AND elem <> ''
+                    ORDER BY lower(elem), idx
+                ) AS unique_ingredients
+                ORDER BY idx
+            )
+            WHERE normalized_ingredients IS NOT NULL;
+        """)
+        conn.commit()
+        print("Successfully removed duplicates from all recipes")
+
+    except Exception as e:
+        print(f"Error deduplicating ingredients: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+
 def normalize_ingredient(ingredient_text):
     # Якщо ingredient_text — це рядок, який виглядає як список, розпарсимо його
     if isinstance(ingredient_text, str) and ingredient_text.startswith("[") and ingredient_text.endswith("]"):
@@ -30,6 +61,13 @@ def normalize_ingredient(ingredient_text):
     normalized_ingredients = []
 
     for ingredient in ingredients:
+        if ingredient.strip().lower() == "half and half":
+            normalized_ingredients.append("half-and-half")
+            continue
+        if ingredient.strip().lower() == "salt and pepper":
+            normalized_ingredients.append("salt")
+            normalized_ingredients.append("pepper")
+            continue
         doc = nlp(ingredient)
 
         # Set of measurement units to exclude
@@ -52,7 +90,9 @@ def normalize_ingredient(ingredient_text):
         additional_exclude = {
             "optional", "more", "as", "needed", "to", "taste", "divided", "enough", "cover",
             "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
-            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced"
+            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced",
+            'unsalted', 'semisweet', 'table','frozen', 'fat','free','powdered', 'kosher', 'light',
+            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat'
         }
 
         # List to store relevant terms
@@ -71,8 +111,13 @@ def normalize_ingredient(ingredient_text):
             if token.dep_ == "compound":
                 relevant_terms.append(f"{token.text}")
             # Focus on nouns, proper nouns, and adjectives that modify nouns
-            elif token.pos_ in {"NOUN", "PROPN", "ADJ"}:
-                if token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN", "VERB"}:
+            elif token.pos_ in {"NOUN", "PROPN", "ADJ", "VERB"}:
+                # Add this inside your token loop
+                if token.pos_ == "VERB":
+                    food_verbs = {"agave", "sift", "whip", "grate", "chop"}  # Add others as needed
+                    if token.lemma_.lower() in food_verbs:
+                        relevant_terms.append(token.lemma_.lower())
+                elif token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN", "VERB"}:
                     relevant_terms.append(token.lemma_.lower())
                 elif token.pos_ in {"NOUN", "PROPN"}:
                     relevant_terms.append(token.lemma_.lower())
@@ -90,7 +135,7 @@ def normalize_and_store_ingredients():
     cur = conn.cursor()
 
     # Fetch all recipes with non-normalized ingredients
-    cur.execute("SELECT id, original_ingredients FROM recipes WHERE normalized_ingredients IS NULL")
+    cur.execute("SELECT id, original_ingredients FROM recipes")
     recipes = cur.fetchall()
 
     for recipe_id, ingredients in recipes:
@@ -115,4 +160,5 @@ def normalize_and_store_ingredients():
 
 if __name__ == "__main__":
     normalize_and_store_ingredients()
+    deduplicate_ingredients()
 

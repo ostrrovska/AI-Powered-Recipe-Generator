@@ -52,7 +52,13 @@ def get_recipe_details(recipe_id):
 
 
 def store_raw_recipe(conn, recipe):
-    """Store unprocessed data"""
+    """Store data with cleaner ingredient names when available"""
+    ingredients = []
+    for ing in recipe.get("extendedIngredients", []):
+        # Use nameClean if available, otherwise fall back to name
+        clean_name = ing.get("nameClean", ing["name"])
+        ingredients.append(clean_name)
+
     with conn.cursor() as cur:
         cur.execute("""
                 INSERT INTO recipes 
@@ -62,8 +68,8 @@ def store_raw_recipe(conn, recipe):
             recipe.get("sourceUrl", ""),
             recipe["title"],
             "spoonacular_raw",
-            str([ing["name"] for ing in recipe.get("extendedIngredients", [])]),
-            recipe["full_instructions"] or "No instructions provided"  # Ensure non-empty
+            str(ingredients),  # Now using the cleaner names
+            recipe["full_instructions"] or "No instructions provided"
         ))
     conn.commit()
     print(f"Stored: {recipe['title']}")
@@ -71,7 +77,7 @@ def store_raw_recipe(conn, recipe):
 
 def main():
     conn = get_db_connection()
-    recipe_ids = fetch_recipe_ids(3)  # Start with 3 recipes
+    recipe_ids = fetch_recipe_ids(10)  # Start with 3 recipes
 
     for recipe_id in recipe_ids:
         recipe = get_recipe_details(recipe_id)
