@@ -61,7 +61,8 @@ def normalize_ingredient(ingredient_text):
     normalized_ingredients = []
 
     for ingredient in ingredients:
-        if ingredient.strip().lower() == "half and half":
+        if (ingredient.strip().lower() == "half and half" or
+                ingredient.strip().lower() == "half-and-half"):
             normalized_ingredients.append("half-and-half")
             continue
         if ingredient.strip().lower() == "salt and pepper":
@@ -92,7 +93,16 @@ def normalize_ingredient(ingredient_text):
             "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
             '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced",
             'unsalted', 'semisweet', 'table','frozen', 'fat','free','powdered', 'kosher', 'light',
-            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat'
+            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat', 'steel'
+        }
+
+        food_terms = {
+            # Herbs
+            "oregano", "basil", "thyme", "rosemary", "sage",
+            "dill", "mint", "parsley", "cilantro", "chives",
+            # Spices
+            "cumin", "paprika", "cinnamon", "nutmeg", "cloves",
+            "cardamom", "turmeric", "ginger", "coriander"
         }
 
         # List to store relevant terms
@@ -105,6 +115,12 @@ def normalize_ingredient(ingredient_text):
                     token.lemma_.lower() in measurement_units or
                     token.is_punct or token.lemma_.lower() in additional_exclude):
                 continue
+
+            if token.text.lower() in food_terms:
+                relevant_terms.append(token.text.lower())
+                continue
+            #if token.pos_ == "X" and token.text.lower() not in food_terms:
+            #    print(f"Unknown X-tagged food term: {token.text}")
 
             # Handle compound phrases
             if token.dep_ == "compound":
