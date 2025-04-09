@@ -15,12 +15,18 @@ def get_db_connection():
 
 def fetch_all_recipes():
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT title, normalized_ingredients 
-        FROM recipes 
-        WHERE normalized_ingredients IS NOT NULL
-    """)
-    recipes = cur.fetchall()
+    query = """
+           SELECT title, normalized_ingredients, cooking_process 
+           FROM recipes 
+           WHERE normalized_ingredients IS NOT NULL 
+       """
+    df = pd.read_sql(query, conn)
     conn.close()
-    return pd.DataFrame(recipes, columns=["title", "normalized_ingredients"])
+
+    # Конвертація в рядок і розділення на список
+    df["normalized_ingredients"] = df["normalized_ingredients"].astype(str).str.split(',')
+
+    # Фільтрація порожніх списків
+    df = df[df["normalized_ingredients"].apply(len) > 0]
+
+    return df

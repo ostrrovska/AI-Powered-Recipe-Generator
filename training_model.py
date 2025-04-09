@@ -4,11 +4,10 @@ import torch.optim as optim
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
+from db_utils import *
 
 # Завантажити нормалізовані дані
-df = pd.read_csv("normalized_recipes.csv")
-df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split(','))
-
+df = fetch_all_recipes()
 
 # Створити словник унікальних інгредієнтів
 all_ingredients = list(set(ing for sublist in df["normalized_ingredients"] for ing in sublist))

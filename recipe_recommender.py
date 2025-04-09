@@ -3,10 +3,11 @@ import torch.nn as nn
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from db_utils import *
 
 # Завантажити дані
-df = pd.read_csv("normalized_recipes.csv")
-df["normalized_ingredients"] = df["normalized_ingredients"].apply(lambda x: x.split(','))
+df = fetch_all_recipes()
+
 
 # Створити словник унікальних інгредієнтів
 all_ingredients = list(set(ing for sublist in df["normalized_ingredients"] for ing in sublist))

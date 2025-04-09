@@ -82,6 +82,8 @@ ingredients = [
     'baking powder',
     'baking soda',
     'spring onions',
+    'oregano',
+    'coffee'
 
 
 ]

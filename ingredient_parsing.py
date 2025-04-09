@@ -172,7 +172,7 @@ def normalize_and_store_ingredients():
     cur = conn.cursor()
 
     # Fetch all recipes with non-normalized ingredients
-    cur.execute("SELECT id, original_ingredients FROM recipes")
+    cur.execute("SELECT id, original_ingredients FROM recipes WHERE normalized_ingredients IS NULL")
     recipes = cur.fetchall()
 
     for recipe_id, ingredients in recipes:

@@ -67,6 +67,7 @@ def store_raw_recipe(conn, recipe):
             INSERT INTO recipes 
             (url, title, section, original_ingredients, cooking_process)
             VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (url) DO NOTHING
         """, (
             recipe.get("sourceUrl", ""),
             recipe["title"],
@@ -76,7 +77,6 @@ def store_raw_recipe(conn, recipe):
         ))
     conn.commit()
     print(f"Stored: {recipe['title']}")
-
 
 def main():
     conn = get_db_connection()
