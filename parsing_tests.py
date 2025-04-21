@@ -5,6 +5,7 @@ from sympy.physics.units import current
 nlp = spacy.load("en_core_web_md")
 
 def normalize_ingredient(ingredient_text):
+
     doc = nlp(ingredient_text)
 
     # Set of measurement units to exclude
@@ -20,6 +21,11 @@ def normalize_ingredient(ingredient_text):
         "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
         "bite", "size", "bunch", "cups","all", "sized", "chunks", "chunk"
     }
+    PRESERVE_ORIGINAL = {
+        'noodles', 'ramen', 'udon', 'soba', 'spaghetti', 'fettuccine',
+        'linguine', 'penne', 'macaroni', 'fusilli', 'ravioli', 'tortellini',
+        'lasagna', 'beans'
+    }
 
     # Set of fractions to exclude
     fractions = {'½', '¼', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞', '⅙', '⅚', '®'}
@@ -31,6 +37,10 @@ def normalize_ingredient(ingredient_text):
     current_compound = []
 
     for token in doc:
+        if token.text.lower() in PRESERVE_ORIGINAL:
+            relevant_terms.append(token.text.lower())
+            continue
+
         # Skip measurements, numbers, etc. (keep your existing exclusion logic)
         if (token.like_num or token.text in fractions or
                 token.lemma_.lower() in measurement_units or
@@ -79,13 +89,9 @@ def normalize_ingredient(ingredient_text):
 
 # Приклад використання
 ingredients = [
-    'baking powder',
-    'baking soda',
-    'spring onions',
-    'oregano',
-    'coffee'
-
-
+    'japanese ramen noodles',
+    'noodles',
+    'lasagna noodles',
 ]
 
 for ingredient in ingredients:

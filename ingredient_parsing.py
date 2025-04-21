@@ -45,6 +45,7 @@ def deduplicate_ingredients():
 
 
 def normalize_ingredient(ingredient_text):
+
     # Якщо ingredient_text — це рядок, який виглядає як список, розпарсимо його
     if isinstance(ingredient_text, str) and ingredient_text.startswith("[") and ingredient_text.endswith("]"):
         try:
@@ -82,7 +83,13 @@ def normalize_ingredient(ingredient_text):
             "quart", "pint", "dash", "pinch", "clove", "can", "package", "container",
             "jar", "loaf", "bottle", "pack", "cube", "stalk", "bulb", "strip", "packet",
             "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
-            "bite", "size", "bunch", "cups", "all", "sized", "chunks", "chunk", "casing", "dice"
+            "bite", "size", "bunch", "cups", "all", "sized", "chunks", "chunk", "casing", "dice",'stem',
+            'stems',
+        }
+        PRESERVE_ORIGINAL = {
+            'noodles', 'ramen', 'udon', 'soba', 'spaghetti', 'fettuccine',
+            'linguine', 'penne', 'macaroni', 'fusilli', 'ravioli', 'tortellini',
+            'lasagna', 'beans','flakes','seeds'
         }
 
         # Set of fractions to exclude
@@ -93,7 +100,8 @@ def normalize_ingredient(ingredient_text):
             "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
             '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced",
             'unsalted', 'semisweet', 'table','frozen', 'fat','free','powdered', 'kosher', 'light',
-            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat', 'steel'
+            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat', 'steel', 'like',
+            'pd','round','sm'
         }
 
         food_terms = {
@@ -110,6 +118,9 @@ def normalize_ingredient(ingredient_text):
         current_compound = []
 
         for token in doc:
+            if token.text.lower() in PRESERVE_ORIGINAL:
+                relevant_terms.append(token.text.lower())
+                continue
             # Skip measurements, numbers, etc. (keep your existing exclusion logic)
             if (token.like_num or token.text in fractions or
                     token.lemma_.lower() in measurement_units or

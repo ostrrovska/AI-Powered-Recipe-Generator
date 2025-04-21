@@ -51,7 +51,7 @@ model.to(device)
 model.eval()
 
 
-def get_recommendations(user_input, top_k=3, require_all=False):
+def get_recommendations(user_input, top_k=1, require_all=False):
     user_ingredients = [ing.strip().lower() for ing in user_input.split(",")]
 
     def contains_partial_match(ingredient, recipe_ingredients):
@@ -85,11 +85,11 @@ def get_recommendations(user_input, top_k=3, require_all=False):
 
 
 # Тестування
-user_input = input("Введіть інгредієнти (через кому): ")
-require_all = input("Вимагати всі інгредієнти? (так/ні): ").strip().lower() == "так"
-recommendations = get_recommendations(user_input, require_all=require_all)
+# user_input = input(" Enter ingredients (comma-separated): ")
+# require_all = input("Demand all ingredients? (y/n): ").strip().lower() == "y"
+# recommendations = get_recommendations(user_input, require_all=require_all)
 
-print("\nРекомендації:")
-for _, row in recommendations.iterrows():
-    print(f"\nРецепт: {row['title']}")
-    print("Інгредієнти:", ", ".join(row['normalized_ingredients']))
+# print("\nРекомендації:")
+# for _, row in recommendations.iterrows():
+#     print(f"\nРецепт: {row['title']}")
+#     print("Інгредієнти:", ", ".join(row['normalized_ingredients']))
