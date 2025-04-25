@@ -2,16 +2,13 @@
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 load_dotenv()
 
 def get_db_connection():
-    return psycopg2.connect(
-        dbname="recipe_db",
-        user="recipe_user",
-        password="",
-        host="localhost"
-    )
+    database_url = "postgresql://recipe_user:1234@localhost/recipe_db"
+    return create_engine(database_url)
 
 def fetch_all_recipes():
     conn = get_db_connection()
