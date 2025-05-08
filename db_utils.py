@@ -11,14 +11,15 @@ def get_db_connection():
     return create_engine(database_url)
 
 def fetch_all_recipes():
+    engine = get_db_connection()
     conn = get_db_connection()
     query = """
            SELECT title, normalized_ingredients, cooking_process 
            FROM recipes 
            WHERE normalized_ingredients IS NOT NULL 
        """
-    df = pd.read_sql(query, conn)
-    conn.close()
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn)
 
     # Конвертація в рядок і розділення на список
     df["normalized_ingredients"] = df["normalized_ingredients"].astype(str).str.split(',')

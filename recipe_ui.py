@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import messagebox
-from rapidfuzz import process
 from recipe_recommender import get_recommendations
 
 

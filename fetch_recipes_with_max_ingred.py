@@ -1,24 +1,13 @@
 import os
 import requests
-import psycopg2
 from dotenv import load_dotenv
 from time import sleep
+from db_utils import get_db_connection
 
 # Load config
 load_dotenv()
 API_KEY = os.getenv("SPOONACULAR_API_KEY")
 BASE_URL = "https://api.spoonacular.com/recipes"
-
-
-def get_db_connection():
-    """Reuse your existing PostgreSQL connection"""
-    return psycopg2.connect(
-        dbname="recipe_db",
-        user="recipe_user",
-        password="",
-        host="localhost"
-    )
-
 
 def fetch_simple_recipe_ids(count=5, max_ingredients=5):
     """Get random recipe IDs with limited number of ingredients"""
@@ -87,7 +76,7 @@ def main():
     conn = get_db_connection()
 
     # Завантажуємо рецепти з максимум 5 інгредієнтами
-    recipe_ids = fetch_simple_recipe_ids(100, max_ingredients=5)
+    recipe_ids = fetch_simple_recipe_ids(10, max_ingredients=5)
 
     for recipe_id in recipe_ids:
         try:
@@ -98,7 +87,7 @@ def main():
             print(f"Error processing recipe {recipe_id}: {e}")
             continue
 
-    conn.close()
+    conn.engine.dispose()
 
 
 if __name__ == "__main__":
