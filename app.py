@@ -1,3 +1,4 @@
+import gradio as gr
 import torch
 import json
 import numpy as np
@@ -45,31 +46,34 @@ class RecipeRecommender:
         
         return np.vstack(embeddings)
 
-    def get_recipe_embedding(self, ingredients):
-        # Convert ingredients to lowercase and clean
-        ingredients = [ing.strip().lower() for ing in ingredients]
-        # Create ingredient string
-        ingredient_str = ', '.join(ingredients)
-        # Vectorize
-        vec = self.vectorizer.transform([ingredient_str])
+    def find_similar_recipes(self, ingredients: str, num_recipes: int = 5) -> list:
+        """
+        Find recipes similar to the given ingredients.
+
+        Args:
+            ingredients (str): Comma-separated list of ingredients
+            num_recipes (int): Number of recipes to return
+
+        Returns:
+            list: List of recipe dictionaries containing name, ingredients, and instructions
+        """
+        # Convert string to list
+        ingredient_list = [ing.strip().lower() for ing in ingredients.split(',')]
         
-        # Get embedding
+        # Get embedding for input ingredients
+        ingredients_str = ', '.join(ingredient_list)
+        vec = self.vectorizer.transform([ingredients_str])
+        
         with torch.no_grad():
             tensor = torch.FloatTensor(vec.toarray()).to(Config.DEVICE)
             _, embedding = self.model(tensor)
-        
-        return embedding.cpu().numpy()
-
-    def find_similar_recipes(self, ingredients, n=5):
-        """Find similar recipes based on ingredients"""
-        # Get embedding for input ingredients
-        query_embedding = self.get_recipe_embedding(ingredients)
+            query_embedding = embedding.cpu().numpy()
         
         # Calculate similarities
         similarities = cosine_similarity(query_embedding, self.recipe_embeddings)
         
         # Get top N similar recipes
-        top_indices = similarities[0].argsort()[-n:][::-1]
+        top_indices = similarities[0].argsort()[-num_recipes:][::-1]
         
         results = []
         for idx in top_indices:
@@ -78,34 +82,55 @@ class RecipeRecommender:
                 'name': recipe['Name'],
                 'ingredients': recipe['RecipeIngredientParts'],
                 'instructions': recipe['RecipeInstructions'],
-                'similarity': similarities[0][idx]
+                'similarity': float(similarities[0][idx])
             })
         
         return results
 
-def main():
-    # Initialize recommender
-    print("Initializing recipe recommender...")
-    recommender = RecipeRecommender()
-    
-    # Test cases
-    test_ingredients = [
-        ["chicken", "rice", "soy sauce"],
-        ["pasta", "tomato", "garlic", "basil"],
-        ["chocolate", "flour", "sugar", "eggs"],
-        ["potato", "onion", "cheese"]
-    ]
-    
-    # Try each test case
-    for ingredients in test_ingredients:
-        print("\n" + "="*50)
-        print(f"\nFinding recipes similar to: {', '.join(ingredients)}")
-        similar_recipes = recommender.find_similar_recipes(ingredients, n=3)
-        
-        for i, recipe in enumerate(similar_recipes, 1):
-            print(f"\n{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
-            print(f"Ingredients: {recipe['ingredients']}")
-            print(f"Instructions: {recipe['instructions'][:200]}...")
+# Initialize the recommender
+recommender = RecipeRecommender()
 
+def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
+    """
+    Get recipe recommendations based on ingredients.
+    
+    Args:
+        ingredients (str): Comma-separated list of ingredients
+        num_recipes (int): Number of recipes to return
+    
+    Returns:
+        str: Formatted string containing recipe recommendations
+    """
+    recipes = recommender.find_similar_recipes(ingredients, num_recipes)
+    
+    # Format the output
+    output = []
+    for i, recipe in enumerate(recipes, 1):
+        output.append(f"{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
+        output.append(f"Ingredients: {recipe['ingredients']}")
+        output.append(f"Instructions: {recipe['instructions'][:200]}...")
+        output.append("")
+    
+    return "\n".join(output)
+
+# Create the Gradio interface
+demo = gr.Interface(
+    fn=get_recipe_recommendations,
+    inputs=[
+        gr.Textbox(label="Ingredients (comma-separated)", placeholder="chicken, rice, soy sauce"),
+        gr.Slider(minimum=1, maximum=10, value=5, step=1, label="Number of Recipes")
+    ],
+    outputs=gr.Textbox(label="Recipe Recommendations"),
+    title="AI Recipe Recommender",
+    description="Enter ingredients to find similar recipes. Separate ingredients with commas.",
+    examples=[
+        ["chicken, rice, soy sauce", 3],
+        ["pasta, tomato, garlic, basil", 3],
+        ["chocolate, flour, sugar, eggs", 3],
+        ["potato, onion, cheese", 3]
+    ]
+)
+
+# Launch with MCP server enabled
 if __name__ == "__main__":
-    main() 
+    demo.launch(mcp_server=True) 

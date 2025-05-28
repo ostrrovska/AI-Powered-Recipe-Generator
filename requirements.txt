@@ -1,0 +1,7 @@
+torch
+gradio[mcp]
+pandas
+numpy
+scikit-learn
+smolagents[mcp]
+textblob 
