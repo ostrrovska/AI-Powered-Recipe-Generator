@@ -1,23 +1,13 @@
 import pandas as pd
 
+__all__ = ['load_recipes', 'clean_null_values']
+
 def load_recipes():
     return pd.read_csv('db/recipes.csv')
 
-recipes = load_recipes()
-recipes = recipes.dropna(subset=['RecipeIngredientQuantities'])
+def clean_null_values(df, column_name):
+    df = df.dropna(subset=[column_name])
+    return df
 
-print(recipes.head())
-print(recipes.info())
-print(recipes.describe())
-
-print(recipes['Name'].isnull().sum())
-
-print(recipes['RecipeIngredientParts'].isnull().sum())
-
-print(recipes['RecipeIngredientQuantities'].isnull().sum()) 
-
-print(recipes['RecipeInstructions'].isnull().sum())
-
-print(recipes[['Name', 'RecipeIngredientParts', 'RecipeIngredientQuantities', 'RecipeInstructions']].head())
-
-
+df = load_recipes()
+print(df.info())
