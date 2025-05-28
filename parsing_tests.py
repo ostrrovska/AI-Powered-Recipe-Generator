@@ -1,9 +1,11 @@
 import spacy
+from sympy.physics.units import current
 
 # Завантажуємо модель spaCy
 nlp = spacy.load("en_core_web_md")
 
 def normalize_ingredient(ingredient_text):
+
     doc = nlp(ingredient_text)
 
     # Set of measurement units to exclude
@@ -19,6 +21,11 @@ def normalize_ingredient(ingredient_text):
         "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
         "bite", "size", "bunch", "cups","all", "sized", "chunks", "chunk"
     }
+    PRESERVE_ORIGINAL = {
+        'noodles', 'ramen', 'udon', 'soba', 'spaghetti', 'fettuccine',
+        'linguine', 'penne', 'macaroni', 'fusilli', 'ravioli', 'tortellini',
+        'lasagna', 'beans'
+    }
 
     # Set of fractions to exclude
     fractions = {'½', '¼', '¾', '⅓', '⅔', '⅛', '⅜', '⅝', '⅞', '⅙', '⅚', '®'}
@@ -26,36 +33,65 @@ def normalize_ingredient(ingredient_text):
     # List to store relevant terms
     relevant_terms = []
 
+    compound_phrases = []
+    current_compound = []
+
     for token in doc:
-        # Skip numbers, fractions, and measurement units
-        if (token.like_num or
-                token.text in fractions or
-                token.pos_ == "ADP" or
-                token.lemma_.lower() in measurement_units):
+        if token.text.lower() in PRESERVE_ORIGINAL:
+            relevant_terms.append(token.text.lower())
             continue
 
-        # Handle compound nouns
+        # Skip measurements, numbers, etc. (keep your existing exclusion logic)
+        if (token.like_num or token.text in fractions or
+                token.lemma_.lower() in measurement_units or
+                token.is_punct ):
+            continue
+
+        # Handle compound phrases
         if token.dep_ == "compound":
-            relevant_terms.append(f"{token.text}")
-        # Focus on nouns, proper nouns, and adjectives that modify nouns
-        elif token.pos_ in {"NOUN", "PROPN", "ADJ"}:
-            if token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN", "VERB"}:
-                relevant_terms.append(token.lemma_.lower())
-            elif token.pos_ in {"NOUN", "PROPN"}:
-                relevant_terms.append(token.lemma_.lower())
+            current_compound.append(token.text)
+            continue
+
+        # When we find the head noun of a compound phrase
+        if current_compound:
+            if token.pos_ in {"NOUN", "PROPN"}:
+                current_compound.append(token.lemma_.lower())
+                relevant_terms.append(" ".join(current_compound))
+                current_compound = []
+                continue
+            else:
+                # If next token isn't a noun, add compound words separately
+                relevant_terms.extend(current_compound)
+                current_compound = []
+
+        # Handle regular tokens
+        if token.pos_ in {"NOUN", "PROPN"}:
+            relevant_terms.append(token.lemma_.lower())
+        elif token.pos_ == "VERB" and token.dep_ == "ROOT":
+            relevant_terms.append(token.text.lower())  # Keep verbs like "baking" as-is
+        elif token.pos_ == "ADJ":
+            relevant_terms.append(token.lemma_.lower())
+
+        # Add any remaining compound terms
+    if current_compound:
+        relevant_terms.extend(current_compound)
+
+        # Remove duplicates while preserving order
+    seen = set()
+    unique_terms = []
+    for term in relevant_terms:
+        if term not in seen:
+            seen.add(term)
+            unique_terms.append(term)
 
     return " ".join(relevant_terms)
 
 
 # Приклад використання
 ingredients = [
-    '2 medium potatoes, cubed',
-    '1 medium butternut squash - peeled, seeded, and cubed',
-'1 teaspoon dried thyme leaves',
-    '3 (15.8 ounce) cans great Northern or other white beans, undrained',
-    '1 quart chicken broth (carton or can)'
-
-
+    'japanese ramen noodles',
+    'noodles',
+    'lasagna noodles',
 ]
 
 for ingredient in ingredients:

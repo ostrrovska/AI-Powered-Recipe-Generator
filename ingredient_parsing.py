@@ -1,13 +1,51 @@
 import pandas as pd
 import spacy
 import ast
+import psycopg2
 
 nlp = spacy.load("en_core_web_md")
+def get_db_connection():
+    return psycopg2.connect(
+        dbname="recipe_db",       # Your database name
+        user="recipe_user",       # Your database user
+        password="1234", # Your database password
+        host="localhost"          # Your database host
+    )
 
-df = pd.read_csv("recipes.csv")
+
+def deduplicate_ingredients():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Update all recipes using PostgreSQL's array functions
+        cur.execute("""
+            UPDATE recipes
+            SET normalized_ingredients = ARRAY(
+                SELECT elem
+                FROM (
+                    SELECT DISTINCT ON (lower(elem)) elem, idx
+                    FROM unnest(normalized_ingredients) WITH ORDINALITY AS arr(elem, idx)
+                    WHERE elem IS NOT NULL AND elem <> ''
+                    ORDER BY lower(elem), idx
+                ) AS unique_ingredients
+                ORDER BY idx
+            )
+            WHERE normalized_ingredients IS NOT NULL;
+        """)
+        conn.commit()
+        print("Successfully removed duplicates from all recipes")
+
+    except Exception as e:
+        print(f"Error deduplicating ingredients: {e}")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
 
 
 def normalize_ingredient(ingredient_text):
+
     # Якщо ingredient_text — це рядок, який виглядає як список, розпарсимо його
     if isinstance(ingredient_text, str) and ingredient_text.startswith("[") and ingredient_text.endswith("]"):
         try:
@@ -24,6 +62,14 @@ def normalize_ingredient(ingredient_text):
     normalized_ingredients = []
 
     for ingredient in ingredients:
+        if (ingredient.strip().lower() == "half and half" or
+                ingredient.strip().lower() == "half-and-half"):
+            normalized_ingredients.append("half-and-half")
+            continue
+        if ingredient.strip().lower() == "salt and pepper":
+            normalized_ingredients.append("salt")
+            normalized_ingredients.append("pepper")
+            continue
         doc = nlp(ingredient)
 
         # Set of measurement units to exclude
@@ -37,7 +83,13 @@ def normalize_ingredient(ingredient_text):
             "quart", "pint", "dash", "pinch", "clove", "can", "package", "container",
             "jar", "loaf", "bottle", "pack", "cube", "stalk", "bulb", "strip", "packet",
             "envelope", "box", "bag", "carton", "sprig", "leaf", "fluid", "inch", "piece", "cup",
-            "bite", "size", "bunch", "cups", "all", "sized", "chunks", "chunk", "casing", "dice"
+            "bite", "size", "bunch", "cups", "all", "sized", "chunks", "chunk", "casing", "dice",'stem',
+            'stems',
+        }
+        PRESERVE_ORIGINAL = {
+            'noodles', 'ramen', 'udon', 'soba', 'spaghetti', 'fettuccine',
+            'linguine', 'penne', 'macaroni', 'fusilli', 'ravioli', 'tortellini',
+            'lasagna', 'beans','flakes','seeds'
         }
 
         # Set of fractions to exclude
@@ -46,30 +98,77 @@ def normalize_ingredient(ingredient_text):
         additional_exclude = {
             "optional", "more", "as", "needed", "to", "taste", "divided", "enough", "cover",
             "cut", "into", "pieces", "such", "for", "with", "optional)", "needed)", "etc.", "or",
-            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant"
+            '®', "cubed", "medium", "large", "small", "undrained", "fashioned", "instant", "diced",
+            'unsalted', 'semisweet', 'table','frozen', 'fat','free','powdered', 'kosher', 'light',
+            'whole','ground', 'sun', 'roasted', 'runny', 'short', 'sharp', 'wheat', 'steel', 'like',
+            'pd','round','sm'
+        }
+
+        food_terms = {
+            # Herbs
+            "oregano", "basil", "thyme", "rosemary", "sage",
+            "dill", "mint", "parsley", "cilantro", "chives",
+            # Spices
+            "cumin", "paprika", "cinnamon", "nutmeg", "cloves",
+            "cardamom", "turmeric", "ginger", "coriander"
         }
 
         # List to store relevant terms
         relevant_terms = []
+        current_compound = []
 
         for token in doc:
-            # Skip numbers, fractions, and measurement units
-            if (token.like_num or
-                    token.text in fractions or
+            if token.text.lower() in PRESERVE_ORIGINAL:
+                relevant_terms.append(token.text.lower())
+                continue
+            # Skip measurements, numbers, etc. (keep your existing exclusion logic)
+            if (token.like_num or token.text in fractions or
                     token.lemma_.lower() in measurement_units or
-                    token.is_punct or
-                    token.lemma_.lower() in additional_exclude):
+                    token.is_punct or token.lemma_.lower() in additional_exclude):
                 continue
 
-            # Handle compound nouns
+            if token.text.lower() in food_terms:
+                relevant_terms.append(token.text.lower())
+                continue
+            #if token.pos_ == "X" and token.text.lower() not in food_terms:
+            #    print(f"Unknown X-tagged food term: {token.text}")
+
+            # Handle compound phrases
             if token.dep_ == "compound":
-                relevant_terms.append(f"{token.text}")
-            # Focus on nouns, proper nouns, and adjectives that modify nouns
-            elif token.pos_ in {"NOUN", "PROPN", "ADJ"}:
-                if token.pos_ == "ADJ" and token.head.pos_ in {"NOUN", "PROPN", "VERB"}:
-                    relevant_terms.append(token.lemma_.lower())
-                elif token.pos_ in {"NOUN", "PROPN"}:
-                    relevant_terms.append(token.lemma_.lower())
+                current_compound.append(token.text)
+                continue
+
+            # When we find the head noun of a compound phrase
+            if current_compound:
+                if token.pos_ in {"NOUN", "PROPN"}:
+                    current_compound.append(token.lemma_.lower())
+                    relevant_terms.append(" ".join(current_compound))
+                    current_compound = []
+                    continue
+                else:
+                    # If next token isn't a noun, add compound words separately
+                    relevant_terms.extend(current_compound)
+                    current_compound = []
+
+            # Handle regular tokens
+            if token.pos_ in {"NOUN", "PROPN"}:
+                relevant_terms.append(token.lemma_.lower())
+            elif token.pos_ == "VERB" and token.dep_ == "ROOT":
+                relevant_terms.append(token.text.lower())  # Keep verbs like "baking" as-is
+            elif token.pos_ == "ADJ":
+                relevant_terms.append(token.lemma_.lower())
+
+            # Add any remaining compound terms
+        if current_compound:
+            relevant_terms.extend(current_compound)
+
+            # Remove duplicates while preserving order
+        seen = set()
+        unique_terms = []
+        for term in relevant_terms:
+            if term not in seen:
+                seen.add(term)
+                unique_terms.append(term)
 
         # Join terms into a single ingredient
         normalized = " ".join(relevant_terms)
@@ -79,11 +178,35 @@ def normalize_ingredient(ingredient_text):
     # Return ingredients as a comma-separated string
     return ",".join(normalized_ingredients)
 
+def normalize_and_store_ingredients():
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-df["normalized_ingredients"] = df["ingredients"].apply(normalize_ingredient)
+    # Fetch all recipes with non-normalized ingredients
+    cur.execute("SELECT id, original_ingredients FROM recipes WHERE normalized_ingredients IS NULL")
+    recipes = cur.fetchall()
 
-#for original, normalized in zip(df["ingredients"], df["normalized_ingredients"]):
-#    print(f"Оригінал: {original}")
- #   print(f"Нормалізовано: {normalized}\n")
+    for recipe_id, ingredients in recipes:
+        try:
+            # Normalize the ingredients
+            normalized = normalize_ingredient(ingredients)
 
-df.to_csv("normalized_recipes.csv", index=False)
+            # Update the database
+            cur.execute("""
+                UPDATE recipes
+                SET normalized_ingredients = %s
+                WHERE id = %s
+            """, (normalized.split(','), recipe_id))
+            conn.commit()
+        except Exception as e:
+            print(f"Error normalizing recipe {recipe_id}: {e}")
+            conn.rollback()
+
+    cur.close()
+    conn.close()
+    print("Ingredient normalization complete.")
+
+if __name__ == "__main__":
+    normalize_and_store_ingredients()
+    deduplicate_ingredients()
+
