@@ -7,6 +7,9 @@ import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from parse_parquet import load_parquet_file
+import requests
+from PIL import Image
+from io import BytesIO
 
 class RecipeRecommender:
     def __init__(self, model_path='best_recipe_model.pth', vocab_path='ingredient_vocab.json'):
@@ -75,7 +78,7 @@ class RecipeRecommender:
             num_recipes (int): Number of recipes to return
 
         Returns:
-            list: List of recipe dictionaries containing name, ingredients, quantities, and instructions
+            list: List of recipe dictionaries containing name, ingredients, quantities, instructions, and image
         """
         # Convert string to list and clean
         ingredient_list = [ing.strip().lower() for ing in ingredients.split(',')]
@@ -112,10 +115,20 @@ class RecipeRecommender:
                 'ingredients': recipe['RecipeIngredientParts'],  # Already a list in Parquet
                 'RecipeIngredientQuantities': recipe['RecipeIngredientQuantities'],  # Add quantities
                 'instructions': recipe['RecipeInstructions'],  # Already a list in Parquet
-                'similarity': float(similarities[0][idx])
+                'similarity': float(similarities[0][idx]),
+                'image': recipe['Images']  # Add image URL
             })
         
         return results
+
+def download_image(url):
+    """Download image from URL and return as PIL Image object."""
+    try:
+        response = requests.get(url, timeout=5)
+        return Image.open(BytesIO(response.content))
+    except:
+        # Return a default image or None if download fails
+        return None
 
 # Initialize the recommender
 try:
@@ -124,7 +137,7 @@ except Exception as e:
     print(f"Error initializing recommender: {e}")
     raise
 
-def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
+def get_recipe_recommendations(ingredients: str, num_recipes: int = 5):
     """
     Get recipe recommendations based on ingredients.
     
@@ -133,13 +146,27 @@ def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
         num_recipes (int): Number of recipes to return
     
     Returns:
-        str: Formatted string containing recipe recommendations
+        tuple: (list of images, formatted text output)
     """
     recipes = recommender.find_similar_recipes(ingredients, num_recipes)
     
-    # Format the output
+    # Prepare images and text output
+    images = []
     output = []
+    
     for i, recipe in enumerate(recipes, 1):
+        # Handle image - check if it's a non-empty array
+        image_data = recipe['image']
+        if isinstance(image_data, (list, np.ndarray)) and len(image_data) > 0:
+            # Try each URL in the array until we find one that works
+            for img_url in image_data:
+                if isinstance(img_url, str) and img_url.startswith('https://img.sndimg.com/'):
+                    img = download_image(img_url)
+                    if img:
+                        images.append(img)
+                        break  # Stop after first successful image
+        
+        # Format recipe text
         output.append(f"\n{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
         
         # Format ingredients with quantities
@@ -171,7 +198,8 @@ def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
         
         output.append("\n" + "="*50)  # Add separator between recipes
     
-    return "\n".join(output)
+    # If no valid images were found, return an empty list
+    return images or [], "\n".join(output)
 
 # Create the Gradio interface
 demo = gr.Interface(
@@ -180,7 +208,10 @@ demo = gr.Interface(
         gr.Textbox(label="Ingredients (comma-separated)", placeholder="chicken, rice, soy sauce"),
         gr.Slider(minimum=1, maximum=10, value=5, step=1, label="Number of Recipes")
     ],
-    outputs=gr.Textbox(label="Recipe Recommendations", lines=25),  # Increased lines for better visibility
+    outputs=[
+        gr.Gallery(label="Recipe Images"),
+        gr.Textbox(label="Recipe Details", lines=25)
+    ],
     title="AI Recipe Recommender",
     description="Enter ingredients to find similar recipes. Separate ingredients with commas.",
     examples=[
