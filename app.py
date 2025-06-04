@@ -75,7 +75,7 @@ class RecipeRecommender:
             num_recipes (int): Number of recipes to return
 
         Returns:
-            list: List of recipe dictionaries containing name, ingredients, and instructions
+            list: List of recipe dictionaries containing name, ingredients, quantities, and instructions
         """
         # Convert string to list and clean
         ingredient_list = [ing.strip().lower() for ing in ingredients.split(',')]
@@ -110,6 +110,7 @@ class RecipeRecommender:
             results.append({
                 'name': recipe['Name'],
                 'ingredients': recipe['RecipeIngredientParts'],  # Already a list in Parquet
+                'RecipeIngredientQuantities': recipe['RecipeIngredientQuantities'],  # Add quantities
                 'instructions': recipe['RecipeInstructions'],  # Already a list in Parquet
                 'similarity': float(similarities[0][idx])
             })
@@ -139,19 +140,36 @@ def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
     # Format the output
     output = []
     for i, recipe in enumerate(recipes, 1):
-        output.append(f"{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
+        output.append(f"\n{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
         
-        # Format ingredients
-        output.append("Ingredients:")
-        for ing in recipe['ingredients']:
-            output.append(f"- {ing}")
+        # Format ingredients with quantities
+        output.append("\nIngredients:")
+        quantities = recipe['RecipeIngredientQuantities']
+        ingredients = recipe['ingredients']
+        
+        # Ensure quantities and ingredients are lists
+        if isinstance(quantities, str):
+            quantities = eval(quantities)
+        if isinstance(ingredients, str):
+            ingredients = eval(ingredients)
+            
+        # Zip quantities and ingredients together
+        for qty, ing in zip(quantities, ingredients):
+            if qty and qty.strip():  # If quantity exists
+                output.append(f"- {qty.strip()} {ing}")
+            else:
+                output.append(f"- {ing}")
         
         # Format instructions
         output.append("\nInstructions:")
-        for idx, step in enumerate(recipe['instructions'], 1):
+        instructions = recipe['instructions']
+        if isinstance(instructions, str):
+            instructions = eval(instructions)
+            
+        for idx, step in enumerate(instructions, 1):
             output.append(f"{idx}. {step}")
         
-        output.append("\n")
+        output.append("\n" + "="*50)  # Add separator between recipes
     
     return "\n".join(output)
 
@@ -162,7 +180,7 @@ demo = gr.Interface(
         gr.Textbox(label="Ingredients (comma-separated)", placeholder="chicken, rice, soy sauce"),
         gr.Slider(minimum=1, maximum=10, value=5, step=1, label="Number of Recipes")
     ],
-    outputs=gr.Textbox(label="Recipe Recommendations"),
+    outputs=gr.Textbox(label="Recipe Recommendations", lines=25),  # Increased lines for better visibility
     title="AI Recipe Recommender",
     description="Enter ingredients to find similar recipes. Separate ingredients with commas.",
     examples=[
