@@ -80,7 +80,7 @@ class RecipeRecommender:
             recipe = self.df.iloc[idx]
             results.append({
                 'name': recipe['Name'],
-                'ingredients': recipe['RecipeIngredientParts'],
+                'ingredients': ", ".join(recipe['RecipeIngredientParts']),
                 'instructions': recipe['RecipeInstructions'],
                 'similarity': float(similarities[0][idx])
             })
@@ -108,7 +108,7 @@ def get_recipe_recommendations(ingredients: str, num_recipes: int = 5) -> str:
     for i, recipe in enumerate(recipes, 1):
         output.append(f"{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
         output.append(f"Ingredients: {recipe['ingredients']}")
-        output.append(f"Instructions: {recipe['instructions'][:200]}...")
+        output.append(f"Instructions: {recipe['instructions']}")
         output.append("")
     
     return "\n".join(output)

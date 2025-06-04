@@ -2,6 +2,7 @@ import torch
 import json
 import numpy as np
 from training_model import RecipeAutoencoder, Config
+from retrieve_csv import load_recipes, clean_null_values, preprocess_ingredient_parts
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -20,7 +21,9 @@ class RecipeRecommender:
         self.model.eval()
 
         # Load recipe data
-        self.df = pd.read_csv('db/recipes.csv')
+        self.df = preprocess_ingredient_parts(
+            clean_null_values(load_recipes(), 'RecipeIngredientParts')
+        )
         
         # Create vectorizer with loaded vocabulary
         self.vectorizer = CountVectorizer(vocabulary=self.vocab)
@@ -30,7 +33,8 @@ class RecipeRecommender:
 
     def _compute_all_embeddings(self):
         print("Computing recipe embeddings...")
-        all_ingredients = self.df['RecipeIngredientParts'].fillna('').str.lower()
+        # Convert list of ingredients to comma-separated strings
+        all_ingredients = self.df['RecipeIngredientParts'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '').str.lower()
         ingredient_matrix = self.vectorizer.transform(all_ingredients)
         
         embeddings = []
@@ -74,21 +78,9 @@ class RecipeRecommender:
         results = []
         for idx in top_indices:
             recipe = self.df.iloc[idx]
-            # Clean up ingredients by removing c() notation and quotes
-            ingredients_str = recipe['RecipeIngredientParts']
-            if isinstance(ingredients_str, str):
-                # Remove c() wrapper if present
-                if ingredients_str.startswith('c(') and ingredients_str.endswith(')'):
-                    ingredients_str = ingredients_str[2:-1]
-                # Split by commas and clean up each ingredient
-                ingredients_list = [ing.strip().strip('"\'') for ing in ingredients_str.split(',')]
-                ingredients_list = [ing for ing in ingredients_list if ing]  # Remove empty strings
-            else:
-                ingredients_list = []
-            
             results.append({
                 'name': recipe['Name'],
-                'ingredients': ingredients_list,
+                'ingredients': recipe['RecipeIngredientParts'],
                 'instructions': recipe['RecipeInstructions'],
                 'similarity': similarities[0][idx]
             })
@@ -117,8 +109,8 @@ def main():
         
         for i, recipe in enumerate(similar_recipes, 1):
             print(f"\n{i}. {recipe['name']} (Similarity: {recipe['similarity']:.2f})")
-            print(f"Ingredients: {', '.join(recipe['ingredients'])}")
-            print(f"Instructions: {recipe['instructions'][:200]}...")
+            print(f"Ingredients: {recipe['ingredients']}")
+            print(f"Instructions: {recipe['instructions']}")
 
 if __name__ == "__main__":
     main() 
