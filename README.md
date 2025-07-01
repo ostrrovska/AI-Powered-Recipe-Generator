@@ -1,39 +1,44 @@
 AI Recipe Recommender
+
 Find recipes that match the ingredients you have! Enter a list of ingredients, choose how many suggestions you want, and get detailed recipes instantly.
 
 🌟 Features
-Input your ingredients (comma-separated)
 
-Choose number of recipe results
+- Input your ingredients (comma-separated)
 
-Get:
+- Choose number of recipe results
 
-Matched recipe title
+- Get:
 
-Ingredients list
+1. Matched recipe title
 
-Step-by-step instructions
+2. Ingredients list
 
-Similarity score
+3. Step-by-step instructions
+
+4. Similarity score
 
 🚀 How to Use
-Enter ingredients, e.g.:
 
-avocado, tomato, garlic
+1. Enter ingredients, e.g.:
 
-Choose Number of Recipes using the slider.
+      avocado, tomato, garlic
 
-Click Submit to see results.
+2. Choose Number of Recipes using the slider.
 
-Use Clear to reset.
+3. Click Submit to see results.
+
+4. Use Clear to reset.
 
 🧪 Example Inputs
-chicken, rice, soy sauce
 
-pasta, tomato, garlic, basil
+- chicken, rice, soy sauce
 
-chocolate, flour, sugar, eggs
+- pasta, tomato, garlic, basil
+
+- chocolate, flour, sugar, eggs
 
 📌 Live Demo
+
 👉 https://huggingface.co/spaces/ostrrovska/Recipe-recommender-server
 
